@@ -60,6 +60,8 @@ crates/shelldock-core/        russh、SFTP、指标解析和连接兼容
 
 ## 自动构建
 
-GitHub Actions 验证 Rust 核心、前端及桌面构建。Windows 的构建产物提供 NSIS 安装包，macOS/Linux 提供对应安装包；未配置代码签名或自动更新发布。
+GitHub Actions 在拉取请求、`main` 更新及手动触发时验证 Rust 核心、前端及桌面构建，同时生成 Windows x64 的 NSIS `.exe` 安装包与 Linux x64 的 `.deb` 安装包。
+
+在仓库 **Actions → Windows and Linux → 成功的运行 → Artifacts** 下载 `ShellDock-Windows-x64` 或 `ShellDock-Linux-x64`，解压后安装。构建产物保留 14 天；未配置代码签名或自动更新发布。
 
 参考与第三方声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

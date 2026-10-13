@@ -392,7 +392,7 @@ async fn terminal_ack(
     let _ = l
         .bridge
         .pending
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |p| {
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |p| {
             Some(p.saturating_sub(bytes))
         });
     l.bridge.notify.notify_one();
@@ -523,24 +523,29 @@ async fn start_transfer(
     tokio::spawn(async move {
         let permit = tokio::select! {_ = cancel.cancelled()=>None,p=slots.acquire_owned()=>p.ok()};
         if let Some(_permit) = permit {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(32);
+            let (tx, mut rx) = tokio::sync::mpsc::channel::<TransferProgress>(32);
             let event_app = app.clone();
-            tokio::spawn(async move {
+            let progress_task = tokio::spawn(async move {
+                let mut finalized = false;
                 while let Some(event) = rx.recv().await {
+                    finalized |=
+                        matches!(event.status.as_str(), "completed" | "failed" | "cancelled");
                     let _ = event_app.emit_to("main", "transfer-progress", event);
                 }
+                finalized
             });
-            if let Err(e) = session
+            let outcome = session
                 .transfer(
                     task_id.clone(),
                     &direction,
                     &PathBuf::from(local),
                     &remote,
-                    cancel,
+                    cancel.clone(),
                     tx,
                 )
-                .await
-            {
+                .await;
+            let finalized = progress_task.await.unwrap_or(false);
+            if let Some(e) = outcome.err().filter(|_| !finalized) {
                 let _ = app.emit_to(
                     "main",
                     "transfer-progress",
@@ -550,7 +555,12 @@ async fn start_transfer(
                         direction,
                         transferred: 0,
                         total: 0,
-                        status: "failed".into(),
+                        status: if cancel.is_cancelled() {
+                            "cancelled"
+                        } else {
+                            "failed"
+                        }
+                        .into(),
                         error: Some(e.to_string()),
                     },
                 );
@@ -653,7 +663,7 @@ pub fn run() {
                     for c in transfers.values() {
                         c.cancel();
                     }
-                }
+                };
             }
         });
 }
