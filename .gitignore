@@ -1,0 +1,15 @@
+node_modules/
+dist/
+target/
+.DS_Store
+*.log
+*.pem
+*.key
+.env*
+!.env.example
+src-tauri/gen/
+test-results/
+playwright-report/
+local-data/
+*_connect_config.json
+!tests/fixtures/*_connect_config.json
