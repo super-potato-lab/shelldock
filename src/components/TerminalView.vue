@@ -18,9 +18,10 @@ function note(text: string) { write(new TextEncoder().encode(`\r\n\x1b[38;5;244m
 function find(value: string) { if (value) search?.findNext(value); }
 function focus() { term?.focus(); }
 function dimensions() { return {columns: term?.cols || 100, rows: term?.rows || 30}; }
-defineExpose({write, note, find, focus, dimensions});
+function selection() { return term?.getSelection() || ''; }
+defineExpose({write, note, find, focus, dimensions, selection});
 onMounted(() => {
-  term = new Terminal({fontFamily: 'Consolas, "Cascadia Mono", "Liberation Mono", monospace', fontSize: props.fontSize, cursorBlink: true, scrollback: 10000, allowProposedApi: false, theme: {background: '#101010', foreground: '#e6e6e6', cursor: '#eeeeee'}});
+  term = new Terminal({fontFamily: 'Consolas, "Cascadia Mono", "Liberation Mono", monospace', fontSize: props.fontSize, cursorBlink: true, scrollback: 10000, allowProposedApi: false, theme: props.light ? {background: '#fafafa', foreground: '#202020', cursor: '#222'} : {background: '#1f1f29', foreground: '#f0f0f0', cursor: '#eeeeee'}});
   fit = new FitAddon(); search = new SearchAddon(); term.loadAddon(fit); term.loadAddon(search); term.open(element.value!);
   term.onData(data => { if (props.connected) emit('input', data); });
   term.parser.registerOscHandler(7, data => { try { const url = new URL(data); if (url.protocol === 'file:') emit('directory', decodeURIComponent(url.pathname)); } catch { /* unrelated OSC */ } return true; });
@@ -29,7 +30,7 @@ onMounted(() => {
 });
 watch(() => props.active, active => { if (active) { fitNow(); setTimeout(focus, 80); } });
 watch(() => props.fontSize, value => { if (term) { term.options.fontSize = value; fitNow(); } });
-watch(() => props.light, light => { if (term) term.options.theme = light ? {background: '#fafafa', foreground: '#202020', cursor: '#222'} : {background: '#101010', foreground: '#e6e6e6', cursor: '#eee'}; });
+watch(() => props.light, light => { if (term) term.options.theme = light ? {background: '#fafafa', foreground: '#202020', cursor: '#222'} : {background: '#1f1f29', foreground: '#f0f0f0', cursor: '#eee'}; });
 onBeforeUnmount(() => { clearTimeout(resizer); observer?.disconnect(); term?.dispose(); });
 </script>
 <template><div class="terminal-view" ref="element" /></template>

@@ -60,6 +60,8 @@ pub struct FileEntry {
     pub size: u64,
     pub modified: u32,
     pub permissions: Option<u32>,
+    pub uid: Option<u32>,
+    pub gid: Option<u32>,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
