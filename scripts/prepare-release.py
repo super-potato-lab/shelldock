@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate both installers and stage an immutable, commit-specific release."""
+"""Validate installers and the portable ZIP before staging a release."""
 
 import hashlib
 import json
@@ -9,6 +9,7 @@ import re
 import shutil
 import sys
 import tomllib
+import zipfile
 
 
 def main():
@@ -38,10 +39,23 @@ def main():
         raise SystemExit("Releases are only allowed from main or matching version tags")
 
     packages = []
-    for extension in (".exe", ".deb"):
+    for extension in (".exe", ".deb", ".zip"):
         matches = sorted(p for p in source.rglob(f"*{extension}") if p.is_file())
         if len(matches) != 1 or matches[0].stat().st_size == 0:
-            raise SystemExit(f"Expected exactly one nonempty {extension} installer")
+            raise SystemExit(f"Expected exactly one nonempty {extension} package")
+        if extension == ".zip":
+            if matches[0].name != f"ShellDock_{version}_windows_x64_portable.zip":
+                raise SystemExit("Unexpected portable ZIP filename")
+            try:
+                with zipfile.ZipFile(matches[0]) as archive:
+                    required = {"ShellDock.exe", "README.txt", "LICENSE", "THIRD_PARTY_NOTICES.md"}
+                    if set(archive.namelist()) != required or archive.testzip() is not None:
+                        raise SystemExit("Portable ZIP is corrupt or missing required files")
+                    with archive.open("ShellDock.exe") as executable:
+                        if executable.read(2) != b"MZ":
+                            raise SystemExit("Portable ZIP does not contain a Windows executable")
+            except zipfile.BadZipFile as error:
+                raise SystemExit("Invalid portable ZIP") from error
         packages.extend(matches)
     if destination.exists():
         raise SystemExit("Release staging directory already exists")
@@ -59,7 +73,8 @@ def main():
     sha = os.environ["GITHUB_SHA"]
     run_url = f"https://github.com/{repository}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
     Path("release-notes.md").write_text(
-        f"Windows x64 `.exe` 与 Linux x64 `.deb` 安装包。\n\n"
+        "Windows x64 `.exe` 安装包、Windows x64 免安装 `.zip` 和 Linux x64 `.deb` 安装包。\n\n"
+        "免安装版：解压后双击 `ShellDock.exe`；系统需有 Microsoft Edge WebView2 Runtime。\n\n"
         f"应用版本：`{version}`；源码提交：`{sha}`。\n\n"
         f"构建和测试：[GitHub Actions]({run_url})。\n\n"
         "`SHA256SUMS` 提供安装包的 SHA-256 校验值。\n\n"

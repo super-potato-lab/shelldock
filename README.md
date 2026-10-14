@@ -60,9 +60,13 @@ crates/shelldock-core/        russh、SFTP、指标解析和连接兼容
 
 ## 自动构建
 
-GitHub Actions 在拉取请求、`main` 更新、`v*` 标签及手动触发时验证 Rust 核心、前端及桌面构建，同时生成 Windows x64 的 NSIS `.exe` 安装包与 Linux x64 的 `.deb` 安装包。
+GitHub Actions 在拉取请求、`main` 更新、`v*` 标签及手动触发时验证 Rust 核心、前端及桌面构建，同时生成 Windows x64 的 NSIS `.exe` 安装包、免安装 `.zip` 与 Linux x64 的 `.deb` 安装包。
 
-在仓库 [Releases](https://github.com/super-potato-lab/shelldock/releases) 下载 `.exe` 或 `.deb`，无需解压 Actions 产物。每个 Release 同时提供 `SHA256SUMS` 校验文件。
+在仓库 [Releases](https://github.com/super-potato-lab/shelldock/releases) 直接下载安装包或免安装 ZIP。每个 Release 同时提供 `SHA256SUMS` 校验文件。
+
+Windows 免安装版下载 `ShellDock_<版本>_windows_x64_portable.zip`，完整解压后双击 `ShellDock.exe` 即可。ZIP 包含实际应用程序、使用说明和许可证，构建时会验证解压后的程序能打开窗口。
+
+免安装版需要系统已安装 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)，不捆绑该运行时。Visual C++ 运行时静态链接到程序；配置仍保存在当前用户 AppData，密码使用 Windows 凭据管理器，与安装版共享。
 
 - `main` 构建与测试全部成功后，自动发布 `v<应用版本>-preview.<运行编号>` 预发布版。
 - 推送与应用版本一致的标签（例如 `v0.1.0`）后，发布对应版本；版本包含预发布后缀时标记为预发布。
