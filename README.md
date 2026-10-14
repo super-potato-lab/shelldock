@@ -60,8 +60,16 @@ crates/shelldock-core/        russh、SFTP、指标解析和连接兼容
 
 ## 自动构建
 
-GitHub Actions 在拉取请求、`main` 更新及手动触发时验证 Rust 核心、前端及桌面构建，同时生成 Windows x64 的 NSIS `.exe` 安装包与 Linux x64 的 `.deb` 安装包。
+GitHub Actions 在拉取请求、`main` 更新、`v*` 标签及手动触发时验证 Rust 核心、前端及桌面构建，同时生成 Windows x64 的 NSIS `.exe` 安装包与 Linux x64 的 `.deb` 安装包。
 
-在仓库 **Actions → Windows and Linux → 成功的运行 → Artifacts** 下载 `ShellDock-Windows-x64` 或 `ShellDock-Linux-x64`，解压后安装。构建产物保留 14 天；未配置代码签名或自动更新发布。
+在仓库 [Releases](https://github.com/super-potato-lab/shelldock/releases) 下载 `.exe` 或 `.deb`，无需解压 Actions 产物。每个 Release 同时提供 `SHA256SUMS` 校验文件。
+
+- `main` 构建与测试全部成功后，自动发布 `v<应用版本>-preview.<运行编号>` 预发布版。
+- 推送与应用版本一致的标签（例如 `v0.1.0`）后，发布对应版本；版本包含预发布后缀时标记为预发布。
+- 拉取请求只验证和构建，不发布 Release。手动运行支持 `main` 或匹配版本的标签。
+- 三处版本号（`Cargo.toml`、`package.json`、`src-tauri/tauri.conf.json`）必须一致。
+- 安装包全部上传后才公开 Release；重新运行可继续未完成的草稿，不覆盖已发布安装包。
+
+Actions 的 `ShellDock-Windows-x64` / `ShellDock-Linux-x64` 产物仍保留 14 天。Release 附件不受该期限影响。目前未配置代码签名或应用内自动更新。
 
 参考与第三方声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
