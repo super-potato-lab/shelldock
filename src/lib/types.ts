@@ -3,7 +3,7 @@ export interface Connection {
   auth: 'password' | 'key'; privateKeyPath: string | null; notes: string; hasPassword: boolean;
   protocol: string; extra: Record<string, unknown> | null;
 }
-export interface FileEntry { name: string; path: string; isDir: boolean; isSymlink: boolean; size: number; modified: number; permissions: number | null; }
+export interface FileEntry { name: string; path: string; isDir: boolean; isSymlink: boolean; size: number; modified: number; permissions: number | null; uid?: number | null; gid?: number | null; }
 export interface Revision { size: number; modified: number; }
 export interface RemoteText { path: string; content: string; revision: Revision; }
 export interface Metrics {
@@ -17,7 +17,7 @@ export interface Metrics {
 export interface Tab {
   id: string; connection: Connection; sessionId?: string;
   status: 'idle' | 'connecting' | 'connected' | 'closed' | 'error';
-  path: string; metrics: Metrics | null; metricError: string; pendingAck: number;
+  path: string; metrics: Metrics | null; metricHistory: Metrics[]; metricError: string; pendingAck: number;
 }
 export interface Transfer { id: string; name: string; direction: string; transferred: number; total: number; status: string; error: string | null; }
 export type SessionEvent = {event: 'output'; data: number[]} | {event: 'closed'} | {event: 'error'; data: string};

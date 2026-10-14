@@ -1,24 +1,47 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { Activity, Cpu, Network, HardDrive, ChevronDown, Server } from 'lucide-vue-next';
-import type { Tab } from '../lib/types';
-import { bytes, percent } from '../lib/format';
-const props = defineProps<{tab?: Tab}>();
-const nic = ref('');
+import { computed, ref } from 'vue';
+import type { Tab, Metrics } from '../lib/types';
+import { compactBytes } from '../lib/format';
+const props = defineProps<{tab?: Tab; quickCommands: string[]}>();
+const emit = defineEmits<{system: []; copy: []; command: [value: string]; editCommands: []}>();
+const nic = ref(''); const chart = ref<'memory'|'cpu'|'commands'>('cpu');
 const m = computed(() => props.tab?.metrics);
-const mem = computed(() => m.value?.memoryTotal ? (1 - m.value.memoryAvailable / m.value.memoryTotal) * 100 : null);
-const activeNic = computed(() => m.value?.interfaces.find(n => n.name === nic.value) || m.value?.interfaces.find(n => n.name !== 'lo'));
+const history = computed(() => props.tab?.metricHistory || []);
+const memory = (sample: Metrics) => sample.memoryTotal ? (1 - sample.memoryAvailable / sample.memoryTotal) * 100 : null;
+const mem = computed(() => m.value ? memory(m.value) : null);
+const swap = computed(() => m.value ? (m.value.swapTotal ? (1 - m.value.swapFree/m.value.swapTotal)*100 : 0) : null);
+const activeNic = computed(() => m.value?.interfaces.find(n => n.name === nic.value) || m.value?.interfaces.find(n => n.name !== 'lo') || m.value?.interfaces[0]);
+function integerPercent(n: number | null | undefined) { return n == null ? '—' : Math.round(n)+'%'; }
+function width(n: number | null | undefined) { return Math.max(0, Math.min(100, n || 0))+'%'; }
+function points(values: (number | null | undefined)[], max: number, height: number) {
+  return values.map((n, i) => n == null || !Number.isFinite(n) ? null : `${300-(values.length-1-i)*2.5},${height-3-Math.min(max,Math.max(0,n))/Math.max(1,max)*(height-6)}`).filter(Boolean).join(' ');
+}
+const usagePoints = computed(() => points(history.value.map(s => chart.value === 'memory' ? memory(s) : s.cpuPercent), 100, 80));
+const rates = computed(() => history.value.map(s => s.interfaces.find(n => n.name === activeNic.value?.name)));
+const networkMax = computed(() => Math.max(9, ...rates.value.flatMap(n => [n?.receiveRate || 0, n?.sendRate || 0])));
+const receivePoints = computed(() => points(rates.value.map(n => n?.receiveRate), networkMax.value, 56));
+const sendPoints = computed(() => points(rates.value.map(n => n?.sendRate), networkMax.value, 56));
 </script>
 <template>
-  <aside class="monitor-panel">
-    <div class="monitor-title"><Server :size="15"/> 系统监控 <span class="status-dot" :class="{online: tab?.status === 'connected'}"/></div>
-    <div class="host-meta"><strong>{{ tab?.connection.host || '未连接主机' }}</strong><span>{{ m?.system || 'SSH / Linux' }}</span><span>{{ tab?.status === 'connected' ? '运行 ' + Math.floor((m?.uptime || 0) / 3600) + ' 小时' : '连接后自动采集系统信息' }}</span></div>
+  <aside class="monitor-panel" aria-label="系统监控">
+    <div class="sync-state" title="云同步尚未实现">同步状态 <span class="status-dot"/></div>
+    <div class="monitor-ip"><span>IP {{ tab?.connection.host || '-' }}</span><button :disabled="!tab" @click="emit('copy')">复制</button></div>
+    <button class="system-info" @click="emit('system')">系统信息</button>
+    <div class="monitor-line">运行 {{ m ? Math.floor(m.uptime/86400)+' 天' : '-' }}</div>
+    <div class="monitor-line">负载 {{ m?.load.map(n=>n.toFixed(2)).join(', ') || '-' }}</div>
+    <div class="usage-row"><span>CPU</span><div class="usage-bar"><i :style="{width:width(m?.cpuPercent)}"/><span>{{ integerPercent(m?.cpuPercent) }}</span></div></div>
+    <div class="usage-row"><span>内存</span><div class="usage-bar"><i :style="{width:width(mem)}"/><span>{{ integerPercent(mem) }}</span><span>{{ m ? compactBytes(m.memoryTotal-m.memoryAvailable)+'/'+compactBytes(m.memoryTotal) : '—/—' }}</span></div></div>
+    <div class="usage-row"><span>交换</span><div class="usage-bar"><i :style="{width:width(swap)}"/><span>{{ integerPercent(swap) }}</span><span>{{ m ? compactBytes(m.swapTotal-m.swapFree)+'/'+compactBytes(m.swapTotal) : '—/—' }}</span></div></div>
+    <div class="usage-chart">
+      <div class="monitor-tabs"><button :class="{active:chart==='memory'}" @click="chart='memory'">内存</button><button :class="{active:chart==='cpu'}" @click="chart='cpu'">CPU</button><button :class="{active:chart==='commands'}" @click="chart='commands'">命令</button></div>
+      <div v-if="chart==='commands'" class="monitor-commands"><button v-for="value in quickCommands" :key="value" @click="emit('command',value)">{{ value }}</button><button class="edit-commands" @click="emit('editCommands')">编辑…</button></div>
+      <svg v-else viewBox="0 0 300 80" preserveAspectRatio="none" role="img" :aria-label="chart==='cpu'?'CPU 历史曲线':'内存历史曲线'"><polyline :points="usagePoints"/></svg>
+    </div>
     <p v-if="tab?.metricError" class="metric-error" role="status">{{ tab.metricError }}</p>
-    <div class="metric-section"><div class="section-heading"><Cpu :size="14"/> CPU <b>{{ percent(m?.cpuPercent) }}</b></div><div class="meter"><i :style="{width: (m?.cpuPercent || 0) + '%'}"/></div><div class="spark-placeholder"><svg viewBox="0 0 200 35"><path d="M0 32H200"/></svg><span>{{ m?.cpuPercent == null ? '等待两次采样' : '实时 CPU 利用率' }}</span></div></div>
-    <div class="metric-section"><div class="section-heading"><Activity :size="14"/> 内存 <b>{{ percent(mem) }}</b></div><div class="meter memory"><i :style="{width: (mem || 0) + '%'}"/></div><small>{{ m ? bytes(m.memoryTotal - m.memoryAvailable) + ' / ' + bytes(m.memoryTotal) : '— / —' }}</small><div class="muted-row"><span>交换分区</span><span>{{ m ? bytes(m.swapTotal - m.swapFree) + ' / ' + bytes(m.swapTotal) : '—' }}</span></div><div class="muted-row"><span>系统负载</span><span>{{ m?.load.map(n => n.toFixed(2)).join(' / ') || '—' }}</span></div></div>
-    <div class="metric-section"><div class="section-heading"><Network :size="14"/> 网络 <select v-model="nic" aria-label="监控网卡"><option value="">自动选择</option><option v-for="n in m?.interfaces" :key="n.name" :value="n.name">{{ n.name }}</option></select></div><div class="rate-row"><span class="receive">↓ {{ bytes(activeNic?.receiveRate) }}/s</span><span class="send">↑ {{ bytes(activeNic?.sendRate) }}/s</span></div><small>接收 {{ bytes(activeNic?.received) }}　发送 {{ bytes(activeNic?.sent) }}</small></div>
-    <div class="metric-section disks"><div class="section-heading"><HardDrive :size="14"/> 磁盘 <ChevronDown :size="13"/></div><div v-for="disk in m?.disks.filter(d => d.name.startsWith('/dev/')).slice(0, 4)" :key="disk.mount" class="disk"><div><span>{{ disk.mount }}</span><b>{{ percent(disk.total ? disk.used / disk.total * 100 : 0) }}</b></div><div class="meter disk-meter"><i :style="{width: (disk.total ? disk.used / disk.total * 100 : 0) + '%'}"/></div><small>{{ bytes(disk.used) }} / {{ bytes(disk.total) }}</small></div><p v-if="!m" class="empty-small">连接后显示挂载点和使用率</p></div>
-    <div class="process-section"><div class="section-heading">进程 <span class="muted">CPU / 内存</span></div><table><thead><tr><th>名称</th><th>CPU</th><th>内存</th></tr></thead><tbody><tr v-for="p in m?.processes.slice(0, 8)" :key="p.pid" :title="`${p.user} · PID ${p.pid}`"><td>{{ p.command }}</td><td>{{ p.cpu.toFixed(1) }}</td><td>{{ p.memory.toFixed(1) }}</td></tr></tbody></table><p v-if="!m?.processes.length" class="empty-small">暂无进程信息</p></div>
-    <div class="monitor-footer">{{ m ? '最近更新 ' + new Date(m.timestamp * 1000).toLocaleTimeString('zh-CN', {hour12:false}) : '监控数据通过 SSH 采集' }}</div>
+    <div class="network-heading"><span class="send">↑{{ activeNic?.sendRate==null?'':compactBytes(activeNic.sendRate) }}</span><span class="receive">↓{{ activeNic?.receiveRate==null?'':compactBytes(activeNic.receiveRate) }}</span><select v-model="nic" aria-label="监控网卡"><option value="">{{ activeNic?.name || '' }}</option><option v-for="n in m?.interfaces" :key="n.name" :value="n.name">{{ n.name }}</option></select></div>
+    <div class="network-chart"><div class="chart-labels"><span>{{ compactBytes(networkMax) }}</span><span>{{ compactBytes(networkMax*2/3) }}</span><span>{{ compactBytes(networkMax/3) }}</span></div><svg viewBox="0 0 300 56" preserveAspectRatio="none" role="img" aria-label="网络速率历史曲线"><path class="grid" d="M0 3H300 M0 21H300 M0 39H300"/><polyline class="receive-line" :points="receivePoints"/><polyline class="send-line" :points="sendPoints"/></svg></div>
+    <div class="latency-heading" title="当前版本尚未实现延迟测量"><span>— ms</span><span>本机</span></div>
+    <div class="network-chart latency-chart" title="延迟测量尚未实现"><div class="chart-labels"><span>—</span><span>—</span><span>—</span></div><svg viewBox="0 0 300 56" preserveAspectRatio="none" aria-hidden="true"><path class="grid" d="M0 3H300 M0 21H300 M0 39H300"/></svg></div>
+    <div class="disks-table-wrap"><table class="disks-table"><thead><tr><th>路径</th><th>可用/大小</th></tr></thead><tbody><tr v-for="disk in m?.disks" :key="disk.mount" :title="disk.name"><td>{{ disk.mount }}</td><td>{{ compactBytes(disk.available) }}/{{ compactBytes(disk.total) }}</td></tr></tbody></table></div>
   </aside>
 </template>

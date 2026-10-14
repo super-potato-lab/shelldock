@@ -247,6 +247,8 @@ impl RemoteSession {
                 size: m.size.unwrap_or(0),
                 modified: m.mtime.unwrap_or(0),
                 permissions: m.permissions,
+                uid: m.uid,
+                gid: m.gid,
             });
             ensure!(out.len() <= 50000, "目录过大，请选择更具体的路径");
         }
