@@ -22,6 +22,7 @@ export async function installDesktopFixture(page: Page, connectionCount = 28) {
         if(command==='connect'){
           const onEvent=args.onEvent as {id:number};
           setTimeout(()=>callbacks.get(onEvent.id)?.({index:0,message:{event:'output',data:Array.from(new TextEncoder().encode('连接主机成功\r\nWelcome to demo Linux\r\ndemo@demo-node:~$ '))}}),30);
+          await new Promise(resolve=>setTimeout(resolve,200));
           return {status:'connected',sessionId:'session-'+args.id,path:'/home/demo'};
         }
         if(command==='list_files'){

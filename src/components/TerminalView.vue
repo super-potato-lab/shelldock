@@ -29,6 +29,7 @@ onMounted(() => {
   for (const q of queued.splice(0)) write(q.data, q.ack);
 });
 watch(() => props.active, active => { if (active) { fitNow(); setTimeout(focus, 80); } });
+watch(() => props.connected, connected => { if (connected) fitNow(); });
 watch(() => props.fontSize, value => { if (term) { term.options.fontSize = value; fitNow(); } });
 watch(() => props.light, light => { if (term) term.options.theme = light ? {background: '#fafafa', foreground: '#202020', cursor: '#222'} : {background: '#1f1f29', foreground: '#f0f0f0', cursor: '#eee'}; });
 onBeforeUnmount(() => { clearTimeout(resizer); observer?.disconnect(); term?.dispose(); });

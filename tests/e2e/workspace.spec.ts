@@ -32,7 +32,9 @@ test('lists every saved connection and clears quick entries without deleting pro
 test('connected workspace has live charts, SFTP tree, Unix modes and working command history',async({page},testInfo)=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   await installDesktopFixture(page);await page.goto('/');await page.getByRole('button',{name:'连接 demo-node',exact:true}).click();
-  await expect(page.getByLabel('远端路径')).toHaveValue('/home/demo');await expect(page.getByRole('tree',{name:'远端目录树'}).getByRole('button',{name:'打开目录 /home/demo',exact:true})).toBeVisible();
+  await expect(page.getByLabel('远端路径')).toHaveValue('/home/demo');
+  await expect.poll(()=>page.evaluate(()=> (window as any).__testRequests.filter((r:any)=>r.command==='terminal_resize').at(-1)?.args.columns || 0)).toBeGreaterThan(80);
+  await expect(page.getByRole('tree',{name:'远端目录树'}).getByRole('button',{name:'打开目录 /home/demo',exact:true})).toBeVisible();
   const table=page.locator('.file-table');await expect(table.getByText('drwxr-xr-x').first()).toBeVisible();await expect(table.getByText('-rw-r--r--').first()).toBeVisible();await expect(table.getByText('1000/1000').first()).toBeVisible();
   await expect(page.locator('.usage-chart polyline')).not.toHaveAttribute('points','',{timeout:10000});await expect(page.locator('.disks-table').getByText('/run',{exact:true})).toBeVisible();
   await page.getByRole('tree').getByRole('button',{name:'打开目录 /var',exact:true}).click();await expect(page.getByLabel('远端路径')).toHaveValue('/var');await expect(table.getByText('log',{exact:true})).toBeVisible();
